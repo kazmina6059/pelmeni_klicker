@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Пельмень Кликер</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: radial-gradient(circle at 50% 20%, #3a1f0b, #140a03 80%);
+    color: #fff; min-height: 100vh; overflow-x: hidden; user-select: none;
+    transition: background .4s; position: relative;
+  }
+  body.bg-rainbow {
+    background: linear-gradient(135deg, #ff4d4d, #ff9d00, #ffd479, #4caf50, #4da3ff, #4d4dff, #c04dff, #ff4d4d);
+    background-size: 400% 400%;
+    animation: rainbowBg 8s linear infinite;
+  }
+  @keyframes rainbowBg {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 400% 50%; }
+  }
+  
+  #holidayOverlay {
+    position: fixed; inset: 0; pointer-events: none; z-index: 5; overflow: hidden;
+  }
+  .particle {
+    position: absolute; top: -50px; font-size: 24px;
+    animation: fall linear infinite;
+  }
+  @keyframes fall {
+    0% { transform: translateY(-50px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(110vh) rotate(360deg); opacity: 0.3; }
+  }
+
+  #app { max-width: 950px; margin: 0 auto; padding: 15px; position: relative; z-index: 10; }
+  
+  .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+  h1 { font-size: 26px; color: #ffd479; text-shadow: 0 0 15px #ff9d00; }
+  .sub { text-align: center; font-size: 13px; opacity: .7; margin-bottom: 15px; }
+
+  .mute-btn {
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.3);
+    color: #fff; padding: 8px 12px; border-radius: 10px; cursor: pointer;
+    font-weight: bold; font-size: 13px; transition: .2s;
+  }
+  .mute-btn:hover { background: rgba(255,255,255,.2); }
+  .mute-btn.muted { opacity: 0.5; }
+
+  .stats { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 15px; }
+  .stat-box {
+    background: rgba(255,255,255,.07); border: 1px solid rgba(255,200,100,.25);
+    border-radius: 12px; padding: 8px 14px; text-align: center; min-width: 110px;
+  }
+  .stat-box .label { font-size: 11px; opacity: .6; text-transform: uppercase; letter-spacing: 1px; }
+  .stat-box .val { font-size: 19px; font-weight: bold; color: #ffd479; }
+  .stat-box .val.rebirth { color: #c04dff; }
+  .stat-box .val.auto-on { color: #4dff85; }
+
+  .plate-wrap { display: flex; justify-content: center; align-items: center; flex-direction: column; }
+  #plate {
+    width: 240px; height: 240px; border-radius: 50%; cursor: pointer;
+    background: radial-gradient(circle at 50% 45%, #fff 0%, #e8e8e8 55%, #b9b9b9 100%);
+    box-shadow: 0 0 0 8px #cfcfcf, 0 0 0 12px #8a8a8a, 0 15px 35px rgba(0,0,0,.7), inset 0 -10px 25px rgba(0,0,0,.15);
+    display: flex; justify-content: center; align-items: center;
+    font-size: 110px; transition: transform .07s; position: relative;
+  }
+  #plate:active { transform: scale(.93); }
+  #plate .flash {
+    position: absolute; font-size: 20px; font-weight: bold; pointer-events: none;
+    animation: floatUp .8s ease-out forwards; z-index: 10;
+  }
+  @keyframes floatUp {
+    0% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-90px) scale(1.4); }
+  }
+
+  .rarity-popup {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    font-size: 32px; font-weight: 900; padding: 18px 40px; border-radius: 18px;
+    pointer-events: none; z-index: 999; animation: popIn 1.3s ease forwards;
+    text-align: center; text-shadow: 0 3px 10px rgba(0,0,0,.6);
+  }
+  @keyframes popIn {
+    0% { opacity: 0; transform: translate(-50%,-50%) scale(.3); }
+    20% { opacity: 1; transform: translate(-50%,-50%) scale(1.1); }
+    35% { transform: translate(-50%,-50%) scale(1); }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%,-70%) scale(1); }
+  }
+
+  .section { background: rgba(255,255,255,.05); border: 1px solid rgba(255,200,100,.2);
+    border-radius: 16px; padding: 14px; margin-top: 18px; }
+  .section h2 { font-size: 16px; color: #ffd479; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .section.rebirth-section { border-color: rgba(192,77,255,.5); background: rgba(192,77,255,.08); }
+  .section.rebirth-section h2 { color: #c04dff; }
+  .section.shop-section { border-color: rgba(255,204,0,.5); background: rgba(255,204,0,.08); }
+  .section.shop-section h2 { color: #ffcc00; }
+  .section.holiday-section { border-color: rgba(77,255,133,.5); background: rgba(77,255,133,.08); }
+  .section.holiday-section h2 { color: #4dff85; }
+
+  .grid { display: flex; flex-wrap: wrap; gap: 10px; }
+  .item {
+    background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.12);
+    border-radius: 12px; padding: 10px 12px; min-width: 130px; flex: 1 1 130px;
+    display: flex; flex-direction: column; gap: 6px; align-items: center; text-align: center;
+  }
+  .item .name { font-weight: bold; font-size: 14px; }
+  .item .desc { font-size: 11px; opacity: .7; }
+  .item button {
+    background: linear-gradient(#ffb347, #e07b00); border: none; color: #1a0d00;
+    font-weight: bold; padding: 7px 12px; border-radius: 8px; cursor: pointer; font-size: 12px;
+    width: 100%; transition: .15s;
+  }
+  .item button:hover:not(:disabled) { filter: brightness(1.15); }
+  .item button:disabled { background: #444; color: #999; cursor: not-allowed; }
+
+  .bg-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+  .bg-swatch {
+    width: 64px; height: 64px; border-radius: 14px; cursor: pointer;
+    border: 3px solid rgba(255,255,255,.15); transition: .15s;
+    display: flex; align-items: flex-end; justify-content: center;
+    font-size: 11px; font-weight: bold; color: #fff; text-shadow: 0 1px 3px #000;
+    padding-bottom: 4px;
+  }
+  .bg-swatch:hover { transform: scale(1.08); border-color: #ffd479; }
+  .bg-swatch.active { border-color: #ffd479; box-shadow: 0 0 15px #ffb347; }
+  .bg-swatch.rainbow {
+    background: linear-gradient(135deg, #ff4d4d, #ff9d00, #ffd479, #4caf50, #4da3ff, #4d4dff, #c04dff);
+  }
+
+  .inv-item { background: rgba(0,0,0,.3); border-radius: 10px; padding: 8px 12px;
+    border: 1px solid rgba(255,255,255,.1); font-size: 13px; }
+  .inv-item b { color: #ffd479; }
+
+  #log { max-height: 140px; overflow-y: auto; font-size: 12px; line-height: 1.6; opacity: .85; }
+  #log div { border-bottom: 1px dashed rgba(255,255,255,.08); padding: 2px 0; }
+
+  .cat-area { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .cat-avatar { font-size: 64px; filter: drop-shadow(0 0 12px #ffb347); animation: bob 2.5s ease-in-out infinite; transition: filter .3s; }
+  @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+
+  .color-picker { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; justify-content: center; }
+  .color-swatch {
+    width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
+    border: 3px solid rgba(255,255,255,.2); transition: .15s;
+    position: relative;
+  }
+  .color-swatch:hover { transform: scale(1.1); }
+  .color-swatch.active { border-color: #fff; box-shadow: 0 0 15px currentColor; transform: scale(1.15); }
+
+  .btn-big {
+    background: linear-gradient(#ffb347, #e07b00); border: none; color: #1a0d00;
+    font-weight: bold; padding: 12px 20px; border-radius: 12px; cursor: pointer; font-size: 14px;
+  }
+  .btn-big:hover { filter: brightness(1.15); }
+  .btn-big:disabled { background: #444; color: #999; cursor: not-allowed; }
+  .btn-rebirth { background: linear-gradient(#c04dff, #7a1fb3); color: #fff; }
+  .btn-shop { background: linear-gradient(#ffe14d, #cc9900); color: #1a0d00; }
+  .btn-holiday { background: linear-gradient(#4dff85, #1fb34d); color: #002b10; }
+  .btn-stop { background: linear-gradient(#ff4d4d, #b31f1f); color: #fff; }
+
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.85); display: none;
+    justify-content: center; align-items: center; z-index: 1000; }
+  .modal .inner { background: #2a1708; border: 2px solid #ffd479; border-radius: 20px;
+    padding: 25px; max-width: 500px; width: 90%; text-align: center; max-height: 90vh; overflow-y: auto; }
+  .modal h3 { color: #ffd479; margin-bottom: 15px; }
+  
+  .daily-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 15px; }
+  .daily-cell { width: 90px; padding: 10px 5px; border-radius: 12px; border: 2px solid rgba(255,255,255,.15);
+    font-size: 12px; background: rgba(0,0,0,.35); }
+  .daily-cell.done { border-color: #4caf50; opacity: .55; }
+  .daily-cell.today { border-color: #ffd479; box-shadow: 0 0 15px #ffb347; }
+  .daily-cell .em { font-size: 26px; display: block; }
+
+  input[type="date"] {
+    background: #1a0d00; color: #ffd479; border: 1px solid #ffd479; 
+    padding: 8px; border-radius: 8px; font-size: 16px; font-family: inherit;
+    margin: 10px 0; width: 100%; text-align: center;
+  }
+</style>
+</head>
+<body>
+<div id="holidayOverlay"></div>
+
+<div id="app">
+  <div class="top-bar">
+    <h1>🥟 ПЕЛЬМЕНЬ КЛИКЕР 🥟</h1>
+    <button class="mute-btn" id="muteBtn">🔊 Звук: ВКЛ</button>
+  </div>
+  <div class="sub">Кликай по тарелке и лови пельмени разной редкости!</div>
+
+  <div class="stats">
+    <div class="stat-box"><div class="label">Пельмени</div><div class="val" id="statPel">0</div></div>
+    <div class="stat-box"><div class="label">Клики</div><div class="val" id="statClicks">0</div></div>
+    <div class="stat-box"><div class="label">Супер пельмени</div><div class="val" id="statSuper">0</div></div>
+    <div class="stat-box"><div class="label">Автоклик</div><div class="val" id="statAuto">выкл</div></div>
+    <div class="stat-box"><div class="label">Перерождения</div><div class="val rebirth" id="statRebirth">0</div></div>
+  </div>
+
+  <div class="plate-wrap">
+    <div id="plate">🥟</div>
+  </div>
+
+  <div class="section holiday-section" id="bdaySection">
+    <h2>🎂 День рождения</h2>
+    <div id="bdayContent" style="font-size:14px; line-height:1.7; margin-bottom:10px;">
+      Укажи свою дату рождения, и каждый год в этот день тебя будет ждать подарок!
+    </div>
+    <button class="btn-big btn-holiday" id="setBdayBtn">Указать дату рождения 🎂</button>
+  </div>
+
+  <div class="section shop-section">
+    <h2>🛒 Магазин супер-пельменей</h2>
+    <div id="shopContent" style="font-size:14px; line-height:1.7; margin-bottom:10px;"></div>
+    <button class="btn-big btn-shop" id="buySuperBtn">Купить супер-пельмень 🥟✨</button>
+  </div>
+
+  <div class="section rebirth-section">
+    <h2>♻️ Перерождение</h2>
+    <div style="font-size:14px; line-height:1.7; margin-bottom:10px;">
+      Каждое перерождение <b style="color:#c04dff">ускоряет автокликер</b>, но <b>полностью сбрасывает</b>:<br>
+      🥟 все накликанные пельмени &nbsp;•&nbsp; 🐱 Шлёпу &nbsp;•&nbsp; ✨ супер-пельмени &nbsp;•&nbsp; 🎒 инвентарь &nbsp;•&nbsp; ⚡ автокликер<br>
+      <span style="opacity:.7;font-size:13px;">Сохраняются: скины, фоны, цвет Шлёпы и количество перерождений.</span>
+    </div>
+    <div id="rebirthInfo" style="font-size:13px; margin-bottom:10px; opacity:.85;"></div>
+    <button class="btn-big btn-rebirth" id="rebirthBtn">♻️ Переродиться</button>
+  </div>
+
+  <div class="section">
+    <h2>🖼️ Фон</h2>
+    <div class="bg-grid" id="bgGrid"></div>
+  </div>
+
+  <div class="section">
+    <h2>🐱 Питомец Шлёпа</h2>
+    <div class="cat-area" id="catArea">
+      <div class="cat-avatar" id="catAvatar">🐱</div>
+      <div style="flex:1; min-width:200px;">
+        <div id="catStatus" style="font-size:14px; margin-bottom:8px;">Шлёпы нет. Выбей пельмень редкости «ПЕЛЬМЕНЬ», чтобы приручить его!</div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn-big" id="feedCatBtn" disabled>Скормить супер-пельмень 🥟✨</button>
+          <button class="btn-big btn-stop" id="stopAutoBtn" style="display:none;">Остановить автокликер ⛔</button>
+        </div>
+      </div>
+      <button class="btn-big" id="claimCatBtn" disabled style="display:none;">Забрать подарок от Шлёпы 🎁</button>
+    </div>
+    
+    <div style="margin-top:15px;">
+      <div style="font-size:13px; opacity:.8; margin-bottom:8px;">🎨 Цвет Шлёпы:</div>
+      <div class="color-picker" id="catColorPicker"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>🎨 Скины (обмен пельменей)</h2>
+    <div class="grid" id="skinsGrid"></div>
+  </div>
+
+  <div class="section">
+    <h2>🎁 Ежедневные призы (обновляются каждую неделю)</h2>
+    <button class="btn-big" id="openDailyBtn">Открыть ежедневные призы</button>
+  </div>
+
+  <div class="section">
+    <h2>🎒 Инвентарь (редкости)</h2>
+    <div class="grid" id="invGrid"></div>
+  </div>
+
+  <div class="section">
+    <h2>📜 Журнал</h2>
+    <div id="log"></div>
+  </div>
+</div>
+
+<div id="dailyBox" class="modal">
+  <div class="inner">
+    <h3>🎁 Ежедневные призы</h3>
+    <div class="daily-grid" id="dailyGrid"></div>
+    <button class="btn-big" id="closeDailyBtn">Закрыть</button>
+  </div>
+</div>
+
+<div id="bdayModal" class="modal">
+  <div class="inner">
+    <h3>🎂 Когда у тебя день рождения?</h3>
+    <p style="font-size:14px; opacity:.8; margin-bottom:15px;">Мы запомним эту дату и каждый год будем дарить подарки!</p>
+    <input type="date" id="bdayInput">
+    <div style="display:flex; gap:10px; justify-content:center; margin-top:10px;">
+      <button class="btn-big" id="saveBdayBtn">Сохранить</button>
+      <button class="btn-big" id="closeBdayBtn" style="background:#555; color:#fff;">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<div id="bdayGiftModal" class="modal">
+  <div class="inner">
+    <h3>🎉 С Днём Рождения! 🎉</h3>
+    <p style="font-size:16px; margin-bottom:15px;">Шлёпа и все пельмени поздравляют тебя!</p>
+    <div id="bdayGiftContent" style="font-size:18px; color:#ffd479; font-weight:bold; margin-bottom:20px;"></div>
+    <button class="btn-big" id="claimBdayGiftBtn">Забрать подарки 🎁</button>
+  </div>
+</div>
+
+<script>
+// ================= ЗВУКИ (WEB AUDIO API) =================
+let audioCtx = null;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+function playSound(type) {
+  if (!state.soundEnabled) return;
+  initAudio();
+  
+  const osc = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+  
+  osc.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  
+  const now = audioCtx.currentTime;
+
+  if (type === 'click') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(600, now);
+    osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+    gainNode.gain.setValueAtTime(0.3, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+    osc.start(now);
+    osc.stop(now + 0.1);
+  } else if (type === 'rare') {
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(988, now); // B5
+    osc.frequency.setValueAtTime(1319, now + 0.1); // E6
+    gainNode.gain.setValueAtTime(0.1, now);
+    gainNode.gain.setValueAtTime(0.1, now + 0.1);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+    osc.start(now);
+    osc.stop(now + 0.3);
+  } else if (type === 'buy' || type === 'gift') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(523.25, now); // C5
+    osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+    osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
+    gainNode.gain.setValueAtTime(0.2, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+    osc.start(now);
+    osc.stop(now + 0.4);
+  } else if (type === 'eat') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, now);
+    osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+    gainNode.gain.setValueAtTime(0.2, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    osc.start(now);
+    osc.stop(now + 0.2);
+  } else if (type === 'error') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, now);
+    gainNode.gain.setValueAtTime(0.2, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+    osc.start(now);
+    osc.stop(now + 0.3);
+  } else if (type === 'rebirth') {
+    osc.type = 'sine';
+    for(let i=0; i<10; i++) {
+      osc.frequency.setValueAtTime(200 + i*100, now + i*0.05);
+    }
+    gainNode.gain.setValueAtTime(0.2, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+    osc.start(now);
+    osc.stop(now + 0.8);
+  }
+}
+
+document.getElementById('muteBtn').onclick = () => {
+  state.soundEnabled = !state.soundEnabled;
+  document.getElementById('muteBtn').textContent = state.soundEnabled ? '🔊 Звук: ВКЛ' : '🔇 Звук: ВЫКЛ';
+  document.getElementById('muteBtn').classList.toggle('muted', !state.soundEnabled);
+  save();
+  if (state.soundEnabled) playSound('click');
+};
+
+// ================= ДАННЫЕ =================
+const RARITIES = [
+  { id:'common', name:'Обычный', emoji:'🥟', color:'#cfcfcf', weight:60, value:1 },
+  { id:'rare',   name:'Редкий',  emoji:'🥟', color:'#4da3ff', weight:25, value:3 },
+  { id:'leg',    name:'Легендарный', emoji:'✨🥟', color:'#ffcc00', weight:10, value:10 },
+  { id:'myth',   name:'Мифический', emoji:'🔥🥟', color:'#c04dff', weight:4, value:30 },
+  { id:'pelm',   name:'ПЕЛЬМЕНЬ', emoji:'👑🥟', color:'#ff4d4d', weight:1, value:100 },
+];
+const TOTAL_W = RARITIES.reduce((s,r)=>s+r.weight,0);
+
+const SKINS = [
+  { id:'s1', name:'Золотая тарелка', emoji:'🏆', cost:50 },
+  { id:'s2', name:'Космос',         emoji:'🌌', cost:150 },
+  { id:'s3', name:'Лава',           emoji:'🌋', cost:400 },
+  { id:'s4', name:'Радуга',         emoji:'🌈', cost:1000 },
+  { id:'s5', name:'Королевская',    emoji:'👑', cost:2500 },
+  { id:'s6', name:'Пельмень-легенда',emoji:'🐉', cost:5000 },
+];
+
+const BACKGROUNDS = [
+  { id:'default', name:'Тёмный',  css:'radial-gradient(circle at 50% 20%, #3a1f0b, #140a03 80%)', swatch:'radial-gradient(circle at 50% 20%, #3a1f0b, #140a03 80%)' },
+  { id:'red',     name:'Красный',  css:'radial-gradient(circle at 50% 20%, #7a1010, #2b0000 80%)', swatch:'linear-gradient(135deg,#ff4d4d,#8b0000)' },
+  { id:'orange',  name:'Оранжевый',css:'radial-gradient(circle at 50% 20%, #8a4500, #2b1500 80%)', swatch:'linear-gradient(135deg,#ff9d00,#a85000)' },
+  { id:'yellow',  name:'Жёлтый',   css:'radial-gradient(circle at 50% 20%, #8a7a00, #2b2500 80%)', swatch:'linear-gradient(135deg,#ffe14d,#a89000)' },
+  { id:'green',   name:'Зелёный',  css:'radial-gradient(circle at 50% 20%, #1f6a2a, #08200d 80%)', swatch:'linear-gradient(135deg,#4caf50,#1f6a2a)' },
+  { id:'cyan',    name:'Голубой',  css:'radial-gradient(circle at 50% 20%, #0e6a7a, #03202b 80%)', swatch:'linear-gradient(135deg,#4dd8ff,#0e6a7a)' },
+  { id:'blue',    name:'Синий',    css:'radial-gradient(circle at 50% 20%, #10308a, #030b2b 80%)', swatch:'linear-gradient(135deg,#4d7dff,#10308a)' },
+  { id:'purple',  name:'Фиолетовый',css:'radial-gradient(circle at 50% 20%, #4a108a, #15032b 80%)', swatch:'linear-gradient(135deg,#b04dff,#4a108a)' },
+  { id:'rainbow', name:'Радуга',   css:'rainbow', swatch:'rainbow' },
+];
+
+const CAT_COLORS = [
+  { id:'default', name:'Обычный', filter:'drop-shadow(0 0 12px #ffb347)', color:'#ffb347' },
+  { id:'white',   name:'Белый',   filter:'drop-shadow(0 0 12px #ffffff) brightness(3)', color:'#ffffff' },
+  { id:'black',   name:'Чёрный',  filter:'drop-shadow(0 0 12px #555) brightness(0.4)', color:'#555555' },
+  { id:'red',     name:'Красный', filter:'drop-shadow(0 0 12px #ff4d4d) sepia(1) hue-rotate(-50deg) saturate(5)', color:'#ff4d4d' },
+  { id:'orange',  name:'Оранжевый',filter:'drop-shadow(0 0 12px #ff9d00) sepia(1) hue-rotate(-20deg) saturate(4)', color:'#ff9d00' },
+  { id:'yellow',  name:'Жёлтый',  filter:'drop-shadow(0 0 12px #ffe14d) sepia(1) hue-rotate(10deg) saturate(4)', color:'#ffe14d' },
+  { id:'green',   name:'Зелёный', filter:'drop-shadow(0 0 12px #4caf50) sepia(1) hue-rotate(70deg) saturate(4)', color:'#4caf50' },
+  { id:'cyan',    name:'Голубой', filter:'drop-shadow(0 0 12px #4dd8ff) sepia(1) hue-rotate(150deg) saturate(4)', color:'#4dd8ff' },
+  { id:'blue',    name:'Синий',   filter:'drop-shadow(0 0 12px #4d7dff) sepia(1) hue-rotate(190deg) saturate(4)', color:'#4d7dff' },
+  { id:'purple',  name:'Фиолетовый',filter:'drop-shadow(0 0 12px #b04dff) sepia(1) hue-rotate(250deg) saturate(4)', color:'#b04dff' },
+  { id:'pink',    name:'Розовый', filter:'drop-shadow(0 0 12px #ff8fd9) sepia(1) hue-rotate(290deg) saturate(4)', color:'#ff8fd9' },
+];
+
+const DAILY_PRIZES = [
+  { em:'🥟', name:'10 пельменей', fn:()=>{ state.pel += 10; } },
+  { em:'🥟', name:'25 пельменей', fn:()=>{ state.pel += 25; } },
+  { em:'✨', name:'1 супер-пельмень', fn:()=>{ state.superPel += 1; } },
+  { em:'🔥', name:'50 пельменей', fn:()=>{ state.pel += 50; } },
+  { em:'🎁', name:'100 пельменей', fn:()=>{ state.pel += 100; } },
+  { em:'✨', name:'2 супер-пельменя', fn:()=>{ state.superPel += 2; } },
+  { em:'👑', name:'1 мифический пельмень', fn:()=>{ state.inv.myth=(state.inv.myth||0)+1; } },
+];
+
+const HOLIDAYS = {
+  newyear: { name:'Новый год', emoji:'🎄', particles:['❄️','🌨️','🎄','🎅','✨'], months:[12,1] },
+  halloween: { name:'Хэллоуин', emoji:'🎃', particles:['🎃','👻','🦇','🕷️','💀'], months:[10] },
+  valentine: { name:'14 февраля', emoji:'💖', particles:['💖','❤️','💘','🌹','💝'], months:[2] },
+  easter: { name:'Пасха', emoji:'🐣', particles:['🐣','🥚','🐰','🌸','🌷'], months:[] }
+};
+
+// ================= СОСТОЯНИЕ =================
+let state = {
+  pel: 0,
+  totalClicks: 0,
+  superPel: 0,
+  inv: { common:0, rare:0, leg:0, myth:0, pelm:0 },
+  skins: [],
+  activeSkin: null,
+  background: 'default',
+  cat: { has:false, superFed:0, nextGiftAt:0, giftReady:false, color:'default' },
+  autoClicker: false,
+  autoInterval: 2000,
+  rebirths: 0,
+  superBought: 0,
+  weekId: getWeekId(),
+  dailyDone: [],
+  birthday: null,
+  lastBdayYear: null,
+  holidayTheme: 'auto',
+  soundEnabled: true, // НОВОЕ: включен ли звук
+};
+
+function load() {
+  try {
+    const raw = localStorage.getItem('pelm_state');
+    if (raw) {
+      const s = JSON.parse(raw);
+      state = Object.assign(state, s);
+      if (s.weekId !== getWeekId()) {
+        state.weekId = getWeekId();
+        state.dailyDone = [];
+      }
+    }
+  } catch(e) {}
+  // Обновляем кнопку звука при загрузке
+  const mb = document.getElementById('muteBtn');
+  if (mb) {
+    mb.textContent = state.soundEnabled ? '🔊 Звук: ВКЛ' : '🔇 Звук: ВЫКЛ';
+    mb.classList.toggle('muted', !state.soundEnabled);
+  }
+}
+function save() { localStorage.setItem('pelm_state', JSON.stringify(state)); }
+
+function getWeekId() {
+  const d = new Date();
+  const onejan = new Date(d.getFullYear(),0,1);
+  const week = Math.ceil(((d - onejan) / 86400000 + onejan.getDay()+1)/7);
+  return d.getFullYear() + '-W' + week;
+}
+
+// ================= ЛОГ =================
+const logEl = document.getElementById('log');
+function log(msg, color='#ddd') {
+  const div = document.createElement('div');
+  div.style.color = color;
+  div.textContent = msg;
+  logEl.prepend(div);
+  while (logEl.children.length > 40) logEl.removeChild(logEl.lastChild);
+}
+
+// ================= ЦВЕТ ШЛЁПЫ =================
+function applyCatColor() {
+  const cat = CAT_COLORS.find(c => c.id === state.cat.color) || CAT_COLORS[0];
+  const avatar = document.getElementById('catAvatar');
+  if (avatar) avatar.style.filter = cat.filter;
+}
+
+function renderCatColors() {
+  const picker = document.getElementById('catColorPicker');
+  picker.innerHTML = '';
+  CAT_COLORS.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'color-swatch' + (c.id === state.cat.color ? ' active' : '');
+    div.style.background = c.color;
+    div.style.color = c.color;
+    div.title = c.name;
+    div.onclick = () => {
+      state.cat.color = c.id;
+      applyCatColor();
+      playSound('click');
+      save();
+      renderCatColors();
+      log(`🎨 Цвет Шлёпы изменён на «${c.name}»`, '#b04dff');
+    };
+    picker.appendChild(div);
+  });
+}
+
+// ================= ПРАЗДНИКИ =================
+function getActiveHoliday() {
+  if (state.holidayTheme !== 'auto') {
+    return state.holidayTheme === 'none' ? null : HOLIDAYS[state.holidayTheme];
+  }
+  const month = new Date().getMonth() + 1;
+  const day = new Date().getDate();
+  if (month === 10) return HOLIDAYS.halloween;
+  if (month === 12 || (month === 1 && day <= 7)) return HOLIDAYS.newyear;
+  if (month === 2 && day >= 10 && day <= 15) return HOLIDAYS.valentine;
+  if (month === 4) return HOLIDAYS.easter;
+  return null;
+}
+
+let particleInterval = null;
+function applyHolidayTheme() {
+  const overlay = document.getElementById('holidayOverlay');
+  overlay.innerHTML = '';
+  if (particleInterval) { clearInterval(particleInterval); particleInterval = null; }
+  
+  const holiday = getActiveHoliday();
+  if (!holiday) return;
+  
+  function spawnParticle() {
+    const el = document.createElement('div');
+    el.className = 'particle';
+    el.textContent = holiday.particles[Math.floor(Math.random() * holiday.particles.length)];
+    el.style.left = Math.random() * 100 + '%';
+    el.style.animationDuration = (5 + Math.random() * 5) + 's';
+    el.style.fontSize = (16 + Math.random() * 16) + 'px';
+    overlay.appendChild(el);
+    setTimeout(() => el.remove(), 10000);
+  }
+  
+  for (let i = 0; i < 15; i++) setTimeout(spawnParticle, i * 300);
+  particleInterval = setInterval(spawnParticle, 800);
+}
+
+// ================= ДЕНЬ РОЖДЕНИЯ =================
+document.getElementById('setBdayBtn').onclick = () => {
+  document.getElementById('bdayModal').style.display = 'flex';
+  if (state.birthday) {
+    document.getElementById('bdayInput').value = '2000-' + state.birthday;
+  }
+};
+
+document.getElementById('closeBdayBtn').onclick = () => {
+  document.getElementById('bdayModal').style.display = 'none';
+};
+
+document.getElementById('saveBdayBtn').onclick = () => {
+  const val = document.getElementById('bdayInput').value;
+  if (!val) return;
+  const parts = val.split('-');
+  state.birthday = parts[1] + '-' + parts[2];
+  state.lastBdayYear = null;
+  document.getElementById('bdayModal').style.display = 'none';
+  log(`🎂 Дата рождения сохранена: ${parts[2]}.${parts[1]}`, '#4dff85');
+  save(); updateUI(); checkBirthday();
+};
+
+function checkBirthday() {
+  if (!state.birthday) return;
+  const now = new Date();
+  const todayStr = String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+  if (todayStr === state.birthday) {
+    if (state.lastBdayYear !== now.getFullYear()) {
+      showBdayGift();
+    }
+  }
+}
+
+let bdayGiftData = null;
+function showBdayGift() {
+  const prizes = [];
+  prizes.push('500 🥟 пельменей');
+  prizes.push('5 ✨ супер-пельменей');
+  prizes.push('1 👑 мифический пельмень');
+  
+  bdayGiftData = { pel:500, superPel:5, myth:1 };
+  
+  if (!state.skins.includes('bday_skin')) {
+    prizes.push('Новый скин «Праздничный торт» 🎂');
+    bdayGiftData.skin = true;
+  }
+  
+  document.getElementById('bdayGiftContent').innerHTML = prizes.join('<br>');
+  document.getElementById('bdayGiftModal').style.display = 'flex';
+  playSound('gift');
+}
+
+document.getElementById('claimBdayGiftBtn').onclick = () => {
+  if (!bdayGiftData) return;
+  state.pel += bdayGiftData.pel;
+  state.superPel += bdayGiftData.superPel;
+  state.inv.myth += bdayGiftData.myth;
+  if (bdayGiftData.skin && !state.skins.includes('bday_skin')) {
+    state.skins.push('bday_skin');
+    if (!SKINS.find(s => s.id === 'bday_skin')) {
+      SKINS.push({ id:'bday_skin', name:'Праздничный торт', emoji:'🎂', cost:999999 });
+    }
+  }
+  state.lastBdayYear = new Date().getFullYear();
+  document.getElementById('bdayGiftModal').style.display = 'none';
+  log(`🎂 С Днём Рождения! Получены подарки!`, '#4dff85');
+  playSound('buy');
+  save(); updateUI();
+};
+
+// ================= ФОН =================
+function applyBackground(id) {
+  const bg = BACKGROUNDS.find(b => b.id === id) || BACKGROUNDS[0];
+  document.body.classList.remove('bg-rainbow');
+  if (bg.css === 'rainbow') {
+    document.body.style.background = '';
+    document.body.classList.add('bg-rainbow');
+  } else {
+    document.body.style.background = bg.css;
+  }
+  state.background = id;
+}
+
+function renderBackgrounds() {
+  const grid = document.getElementById('bgGrid');
+  grid.innerHTML = '';
+  BACKGROUNDS.forEach(bg => {
+    const div = document.createElement('div');
+    div.className = 'bg-swatch' + (bg.id === state.background ? ' active' : '') + (bg.id === 'rainbow' ? ' rainbow' : '');
+    if (bg.id !== 'rainbow') div.style.background = bg.swatch;
+    div.textContent = bg.name;
+    div.title = bg.name;
+    div.onclick = () => {
+      applyBackground(bg.id);
+      playSound('click');
+      save();
+      renderBackgrounds();
+    };
+    grid.appendChild(div);
+  });
+}
+
+// ================= МАГАЗИН =================
+function superCost() {
+  return 100 + (state.superBought || 0) * 50;
+}
+
+function renderShop() {
+  const cost = superCost();
+  document.getElementById('shopContent').innerHTML =
+    `Купи <b style="color:#ffcc00">супер-пельмень</b> за обычные пельмени.<br>` +
+    `Цена сейчас: <b style="color:#ffd479">${cost} 🥟</b><br>` +
+    `Куплено в магазине: ${state.superBought || 0}`;
+  const btn = document.getElementById('buySuperBtn');
+  btn.textContent = `Купить супер-пельмень за ${cost} 🥟`;
+  btn.disabled = state.pel < cost;
+}
+
+document.getElementById('buySuperBtn').onclick = () => {
+  const cost = superCost();
+  if (state.pel < cost) { playSound('error'); return; }
+  state.pel -= cost;
+  state.superPel += 1;
+  state.superBought = (state.superBought || 0) + 1;
+  log(`🛒 Куплен супер-пельмень за ${cost} 🥟.`, '#ffcc00');
+  playSound('buy');
+  save(); updateUI();
+};
+
+// ================= ПЕРЕРОЖДЕНИЕ =================
+function autoIntervalByRebirth(rebirths) {
+  const base = 2000;
+  const interval = Math.max(100, base * Math.pow(0.8, rebirths));
+  return Math.round(interval);
+}
+
+function rebirth() {
+  const nextInterval = autoIntervalByRebirth(state.rebirths + 1);
+  const ok = confirm(
+    `♻️ ПЕРЕРОЖДЕНИЕ\n\n` +
+    `Ты потеряешь:\n` +
+    `• Все пельмени (${state.pel})\n` +
+    `• Супер-пельмени (${state.superPel})\n` +
+    `• Шлёпу и его прогресс\n` +
+    `• Инвентарь редкостей\n` +
+    `• Автокликер\n\n` +
+    `Ты получишь:\n` +
+    `• Скорость автокликера: ${nextInterval} мс/клик (было ${autoIntervalByRebirth(state.rebirths)} мс)\n` +
+    `• Скины, фоны, цвет Шлёпы и перерождения сохранятся.\n\n` +
+    `Переродиться?`
+  );
+  if (!ok) return;
+
+  state.rebirths++;
+  state.pel = 0;
+  state.superPel = 0;
+  state.totalClicks = 0;
+  state.inv = { common:0, rare:0, leg:0, myth:0, pelm:0 };
+  state.cat = { has:false, superFed:0, nextGiftAt:0, giftReady:false, color: state.cat.color };
+  state.autoClicker = false;
+  state.autoInterval = autoIntervalByRebirth(state.rebirths);
+  state.superBought = 0;
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+
+  log(`♻️ Перерождение #${state.rebirths}! Шлёпа ушёл, но скорость автокликера выросла до ${state.autoInterval} мс.`, '#c04dff');
+  playSound('rebirth');
+  save(); updateUI();
+}
+
+document.getElementById('rebirthBtn').onclick = rebirth;
+
+// ================= РЕНДЕР =================
+function updateUI() {
+  document.getElementById('statPel').textContent = state.pel;
+  document.getElementById('statClicks').textContent = state.totalClicks;
+  document.getElementById('statSuper').textContent = state.superPel;
+  const autoEl = document.getElementById('statAuto');
+  autoEl.textContent = state.autoClicker ? 'ВКЛ' : 'выкл';
+  autoEl.className = 'val' + (state.autoClicker ? ' auto-on' : '');
+  document.getElementById('statRebirth').textContent = state.rebirths;
+
+  renderShop();
+
+  if (state.birthday) {
+    const parts = state.birthday.split('-');
+    document.getElementById('bdayContent').innerHTML = 
+      `Твой день рождения: <b style="color:#4dff85">${parts[1]}.${parts[0]}</b><br>` +
+      `<span style="opacity:.7;font-size:13px;">Каждый год в этот день тебя ждёт подарок!</span>`;
+    document.getElementById('setBdayBtn').textContent = 'Изменить дату рождения 🎂';
+  } else {
+    document.getElementById('bdayContent').textContent = 'Укажи свою дату рождения, и каждый год в этот день тебя будет ждать подарок!';
+    document.getElementById('setBdayBtn').textContent = 'Указать дату рождения 🎂';
+  }
+
+  const curInterval = autoIntervalByRebirth(state.rebirths);
+  const nextInterval = autoIntervalByRebirth(state.rebirths + 1);
+  document.getElementById('rebirthInfo').innerHTML =
+    `Сейчас скорость автокликера: <b style="color:#c04dff">${curInterval} мс</b> на пельмень ` +
+    `(${(1000/curInterval).toFixed(2)}/сек).<br>` +
+    `После перерождения будет: <b style="color:#4caf50">${nextInterval} мс</b> ` +
+    `(${(1000/nextInterval).toFixed(2)}/сек).`;
+
+  const catStatus = document.getElementById('catStatus');
+  const feedBtn = document.getElementById('feedCatBtn');
+  const claimBtn = document.getElementById('claimCatBtn');
+  const stopBtn = document.getElementById('stopAutoBtn');
+  
+  if (state.cat.has) {
+    catStatus.textContent = `Шлёпа накормлен супер-пельменями: ${state.cat.superFed}. ` +
+      (state.autoClicker ? 'Автокликер активен, Шлёпа кликает! ⚡' : 'Скорми Шлёпе супер-пельмень, чтобы получить автокликер!');
+    feedBtn.style.display = 'inline-block';
+    feedBtn.disabled = state.superPel < 1;
+    
+    if (state.autoClicker) {
+      stopBtn.style.display = 'inline-block';
+    } else {
+      stopBtn.style.display = 'none';
+    }
+    
+    if (state.cat.giftReady) {
+      claimBtn.style.display = 'inline-block';
+      claimBtn.disabled = false;
+    } else {
+      claimBtn.style.display = 'none';
+    }
+  } else {
+    catStatus.textContent = 'Шлёпы нет. Выбей пельмень редкости «ПЕЛЬМЕНЬ», чтобы приручить его!';
+    feedBtn.style.display = 'inline-block';
+    feedBtn.disabled = true;
+    claimBtn.style.display = 'none';
+    stopBtn.style.display = 'none';
+  }
+
+  const sg = document.getElementById('skinsGrid');
+  sg.innerHTML = '';
+  SKINS.forEach(sk => {
+    const owned = state.skins.includes(sk.id);
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.innerHTML = `
+      <div style="font-size:30px">${sk.emoji}</div>
+      <div class="name">${sk.name}</div>
+      <div class="desc">${owned ? 'Куплено' : (sk.cost > 100000 ? 'Подарок' : sk.cost + ' 🥟')}</div>
+      <button ${owned ? 'disabled' : ''}>${owned ? (state.activeSkin===sk.id?'Активен':'Выбрать') : 'Купить'}</button>
+    `;
+    const btn = div.querySelector('button');
+    if (owned) {
+      if (state.activeSkin !== sk.id) {
+        btn.disabled = false;
+        btn.textContent = 'Выбрать';
+      } else {
+        btn.textContent = 'Активен';
+      }
+      btn.onclick = () => { state.activeSkin = sk.id; applySkin(sk); playSound('click'); save(); updateUI(); };
+    } else {
+      btn.onclick = () => {
+        if (sk.cost > 100000) return;
+        if (state.pel >= sk.cost) {
+          state.pel -= sk.cost;
+          state.skins.push(sk.id);
+          state.activeSkin = sk.id;
+          applySkin(sk);
+          log(`Куплен скин «${sk.name}»!`, '#4da3ff');
+          playSound('buy');
+          save(); updateUI();
+        } else {
+          playSound('error');
+        }
+      };
+    }
+    sg.appendChild(div);
+  });
+
+  const ig = document.getElementById('invGrid');
+  ig.innerHTML = '';
+  RARITIES.forEach(r => {
+    const c = state.inv[r.id] || 0;
+    const div = document.createElement('div');
+    div.className = 'inv-item';
+    div.innerHTML = `<span style="color:${r.color};font-weight:bold">${r.name}</span> ${r.emoji} — <b>${c}</b>`;
+    ig.appendChild(div);
+  });
+}
+
+function applySkin(sk) {
+  const plate = document.getElementById('plate');
+  const map = {
+    s1: 'radial-gradient(circle at 50% 45%, #fff7c2 0%, #f5c542 55%, #b8860b 100%)',
+    s2: 'radial-gradient(circle at 50% 45%, #2b1055 0%, #13002e 55%, #000 100%)',
+    s3: 'radial-gradient(circle at 50% 45%, #ffd0a0 0%, #ff6a00 55%, #7a1f00 100%)',
+    s4: 'radial-gradient(circle at 50% 45%, #ff9a9e 0%, #a18cd1 30%, #84fab0 60%, #8fd3f4 100%)',
+    s5: 'radial-gradient(circle at 50% 45%, #fff 0%, #ffd479 40%, #b8860b 100%)',
+    s6: 'radial-gradient(circle at 50% 45%, #ff4d4d 0%, #8b0000 60%, #2b0000 100%)',
+    bday_skin: 'radial-gradient(circle at 50% 45%, #fff 0%, #ffb3d9 50%, #b30059 100%)',
+  };
+  plate.style.background = map[sk.id] || '';
+}
+
+// ================= КЛИК =================
+function rollRarity() {
+  let r = Math.random() * TOTAL_W;
+  for (const rar of RARITIES) {
+    r -= rar.weight;
+    if (r <= 0) return rar;
+  }
+  return RARITIES[0];
+}
+
+function doClick() {
+  state.totalClicks++;
+  const rar = rollRarity();
+  state.inv[rar.id] = (state.inv[rar.id]||0) + 1;
+  state.pel += rar.value;
+
+  // Звук клика
+  if (rar.id === 'leg' || rar.id === 'myth' || rar.id === 'pelm') {
+    playSound('rare');
+  } else {
+    playSound('click');
+  }
+
+  const plate = document.getElementById('plate');
+  const flash = document.createElement('div');
+  flash.className = 'flash';
+  flash.textContent = `+${rar.value}`;
+  flash.style.color = rar.color;
+  flash.style.left = (40 + Math.random()*60) + '%';
+  flash.style.top = '40%';
+  plate.appendChild(flash);
+  setTimeout(()=>flash.remove(), 800);
+
+  if (rar.id === 'leg' || rar.id === 'myth' || rar.id === 'pelm') {
+    showRarityPopup(rar);
+  }
+
+  if (rar.id === 'pelm') {
+    if (!state.cat.has) {
+      state.cat.has = true;
+      state.cat.superFed = 0;
+      log('👑 Тебе выпал ПЕЛЬМЕНЬ! Шлёпа пришёл к тебе!', '#ff4d4d');
+    } else {
+      log('👑 Выпал ПЕЛЬМЕНЬ! Шлёпа доволен.', '#ff4d4d');
+    }
+  }
+
+  checkAutoGift();
+  save(); updateUI();
+}
+
+function showRarityPopup(rar) {
+  const el = document.createElement('div');
+  el.className = 'rarity-popup';
+  el.style.color = rar.color;
+  el.style.background = 'rgba(0,0,0,.75)';
+  el.style.border = `2px solid ${rar.color}`;
+  el.innerHTML = `${rar.emoji}<br>${rar.name.toUpperCase()}!`;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 1400);
+}
+
+// ================= ПИТОМЕЦ ШЛЁПА =================
+document.getElementById('feedCatBtn').onclick = () => {
+  if (!state.cat.has || state.superPel < 1) { playSound('error'); return; }
+  state.superPel--;
+  state.cat.superFed++;
+  log(`Шлёпа съел супер-пельмень (всего: ${state.cat.superFed})`, '#ffd479');
+  playSound('eat');
+  if (!state.autoClicker) {
+    state.autoClicker = true;
+    log(`⚡ Шлёпа активировал АВТОКЛИКЕР! Скорость: ${state.autoInterval} мс/клик.`, '#4da3ff');
+    startAutoClicker();
+  } else {
+    log('Шлёпа наелся и даёт подарки чаще!', '#4da3ff');
+  }
+  save(); updateUI();
+};
+
+document.getElementById('stopAutoBtn').onclick = () => {
+  if (!state.autoClicker) return;
+  state.autoClicker = false;
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  log('⛔ Автокликер остановлен. Шлёпа отдыхает.', '#ff4d4d');
+  playSound('error');
+  save(); updateUI();
+};
+
+document.getElementById('claimCatBtn').onclick = () => {
+  if (!state.cat.giftReady) return;
+  state.cat.giftReady = false;
+  const roll = Math.random();
+  let reward;
+  if (roll < 0.4) { const n = 5 + Math.floor(Math.random()*15); state.pel += n; reward = n + ' пельменей'; }
+  else if (roll < 0.7) { state.superPel += 1; reward = '1 супер-пельмень'; }
+  else if (roll < 0.9) { state.inv.leg++; reward = 'легендарный пельмень'; }
+  else { state.inv.myth++; reward = 'мифический пельмень'; }
+  log(`🎁 Шлёпа принёс подарок: ${reward}!`, '#4caf50');
+  playSound('gift');
+  state.cat.nextGiftAt = Date.now() + giftInterval();
+  save(); updateUI();
+};
+
+function giftInterval() {
+  const base = 60000;
+  const reduction = Math.min(state.cat.superFed * 8000, 50000);
+  return Math.max(10000, base - reduction);
+}
+
+function checkAutoGift() {
+  if (!state.cat.has) return;
+  if (state.cat.giftReady) return;
+  if (state.cat.nextGiftAt === 0) {
+    state.cat.nextGiftAt = Date.now() + giftInterval();
+  } else if (Date.now() >= state.cat.nextGiftAt) {
+    state.cat.giftReady = true;
+    log('🎁 Шлёпа приготовил подарок! Забери его.', '#4caf50');
+  }
+}
+
+// ================= АВТОКЛИКЕР =================
+let autoTimer = null;
+function startAutoClicker() {
+  if (autoTimer) clearInterval(autoTimer);
+  autoTimer = setInterval(() => {
+    if (!state.autoClicker) return;
+    state.totalClicks++;
+    const rar = rollRarity();
+    state.inv[rar.id] = (state.inv[rar.id]||0) + 1;
+    state.pel += rar.value;
+    
+    // Автокликер играет звук потише (чтобы не бесило)
+    if (rar.id === 'pelm') {
+      playSound('rare');
+    }
+    
+    if (rar.id === 'pelm' && !state.cat.has) {
+      state.cat.has = true;
+      log('👑 Автоклик выбил ПЕЛЬМЕНЬ! Шлёпа пришёл к тебе!', '#ff4d4d');
+    }
+    checkAutoGift();
+    updateUI();
+  }, state.autoInterval);
+}
+
+// ================= ЕЖЕДНЕВНЫЕ ПРИЗЫ =================
+document.getElementById('openDailyBtn').onclick = () => {
+  renderDaily();
+  document.getElementById('dailyBox').style.display = 'flex';
+  playSound('click');
+};
+document.getElementById('closeDailyBtn').onclick = () => {
+  document.getElementById('dailyBox').style.display = 'none';
+};
+
+function renderDaily() {
+  const grid = document.getElementById('dailyGrid');
+  grid.innerHTML = '';
+  const todayIdx = (new Date().getDay() + 6) % 7;
+  DAILY_PRIZES.forEach((p, i) => {
+    const done = state.dailyDone.includes(i);
+    const isToday = i === todayIdx;
+    const div = document.createElement('div');
+    div.className = 'daily-cell' + (done ? ' done' : '') + (isToday && !done ? ' today' : '');
+    div.innerHTML = `<span class="em">${p.em}</span>${p.name}<br>
+      <button style="margin-top:6px;font-size:11px;padding:4px 8px;border-radius:6px;border:none;cursor:pointer;
+        ${done || !isToday ? 'background:#444;color:#888;cursor:not-allowed;' : 'background:#ffb347;color:#1a0d00;font-weight:bold;'}"
+        ${done || !isToday ? 'disabled' : ''}>${done ? 'Забрано' : (isToday ? 'Забрать' : 'Не сегодня')}</button>`;
+    const btn = div.querySelector('button');
+    if (!done && isToday) {
+      btn.onclick = () => {
+        p.fn();
+        state.dailyDone.push(i);
+        log(`🎁 Ежедневный приз: ${p.name}!`, '#4caf50');
+        playSound('gift');
+        save(); updateUI(); renderDaily();
+      };
+    }
+    grid.appendChild(div);
+  });
+}
+
+// ================= СТАРТ =================
+load();
+applyBackground(state.background || 'default');
+renderBackgrounds();
+renderCatColors();
+applyCatColor();
+if (state.activeSkin) {
+  const sk = SKINS.find(s => s.id === state.activeSkin);
+  if (sk) applySkin(sk);
+}
+state.autoInterval = autoIntervalByRebirth(state.rebirths);
+if (state.autoClicker) startAutoClicker();
+document.getElementById('plate').addEventListener('click', doClick);
+updateUI();
+
+applyHolidayTheme();
+checkBirthday();
+
+setInterval(() => {
+  if (state.cat.has) {
+    checkAutoGift();
+    updateUI();
+  }
+}, 1000);
+
+setInterval(() => {
+  applyHolidayTheme();
+  checkBirthday();
+}, 60000);
+
+</script>
+</body>
+</html>
